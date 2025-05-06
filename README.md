@@ -12,52 +12,66 @@ The API should be easy enough to fit in a single presentation slide.
 
 The idea is to avoid using folder structure and get more benefit of the TypeScript types avoiding code-generation and ide-extensions where possible, and get a more predictable representaion of the results.
 
+Each route consists of a component, a path matchers, and function that return the props of the component baseed on the matcher.
+
+Link paths and parameters can be inferred from the matchers.
+
 ```tsx
-interface Context {
-  path: string;
-  query: Record<string, string | string[]>; // Can be validated for more precise type.
-  parameters: {}; // starts empty, adds more props as the path builds.
-  body: null; // `null` on client. Potentially typed on the server.
+import React from "react";
+import Unfold, { M } from "react-unfolder";
+import Layout from "./components/Layout";
+
+const Home = React.lazy(() => import("./components/Home"));
+
+const HomeRoute = Unfold(Home);
+
+interface AboutProps {
+  section: React.ReactNode;
 }
 
-const { go, link, App, paths } = Unfolder(
-  "/",
-  async (
-    { title, content }: { title: string; content: React.ReactNode },
-    _context: Context
-  ) => ({
-    app: <Layout {...{ title, content }} />,
-  })
-)
-  .current({ title: "Home", content: <Home /> })
-  .to("about", async ({}: {}) => ({
-    title: "About",
-    content: <About />,
-  }))
-  .to(
-    ["page-with-tabs/", Path.String("activeTab", ["", "tab-a", "tab-b"])],
-    async ({}: {}, { parameters: { activeTab } }) => ({
-      // activeTab is automatically typed to "" | "tab-a" | "tab-b"
-      title: `Page with tabs | ${activeTab}`,
-      content: <PageWithTabs activeTab={activeTab} />,
-    })
-  )
-  .to("posts", async ({ selectedPost }: { selectedPost: React.ReactNode }) =>
-    Unfolder({
-      title: "Posts",
-      content: <Posts selectedPost={selectedPost} />,
-    })
-      .current({ selectedPost: undefined })
-      .to(
-        [Path.String("postId")],
-        async ({}: {}, { parameters: { postId } }) => ({
-          selectedPost: <Post id={postId} />,
-        })
-      )
-  );
+const About = React.lazy(() => import("./components/About"));
 
-// `path` is automatically typed to `"/" | "/about"`.
-<a href={link(path)} onClick={() => go(path)}>
-  Link works with or without JS
-</a>;
+const AboutRoute = Unfold(About)(
+  M("about", M.String("section", ["", "first", "second"])),
+  ({ params }) => {
+    switch (params.section) {
+      case "":
+      case "first":
+        return {
+          section: <FirstAboutSection />,
+        };
+      case "second":
+        return {
+          section: <SecondAboutSection />,
+        };
+    }
+  }
+);
+
+interface LayoutProps {
+  title: string;
+  content: React.ReactNode;
+}
+
+const App = Unfold(Layout)(
+  M("/")
+    .to("home", HomeRoute)
+    .to("about", AboutRoute),
+  ({ name }) => {
+    switch (name) {
+      case "home":
+        return {
+          title: "Home",
+          content: <HomeRoute />,
+        };
+      case "about":
+        return {
+          title: "About",
+          content: <AboutRoute />,
+        };
+    }
+  }
+);
+
+export default App;
 ```
