@@ -23,7 +23,7 @@ import Layout from "./components/Layout";
 
 const Home = React.lazy(() => import("./components/Home"));
 
-const HomeRoute = Unfold(Home);
+const HomeRoute = Unfold()(Home);
 
 interface AboutProps {
   section: React.ReactNode;
@@ -31,47 +31,60 @@ interface AboutProps {
 
 const About = React.lazy(() => import("./components/About"));
 
-const AboutRoute = Unfold(About)(
-  M("about", M.String("section", ["", "first", "second"])),
-  ({ params }) => {
-    switch (params.section) {
-      case "":
-      case "first":
-        return {
-          section: <FirstAboutSection />,
-        };
-      case "second":
-        return {
-          section: <SecondAboutSection />,
-        };
-    }
+const AboutRoute = Unfold(
+  // Typed: { section: "" | "first" | "second" }
+  M("section").string("", "first", "second")
+)(About, ({ section }) => {
+  switch (section) {
+    case "":
+    case "first":
+      return {
+        section: <FirstAboutSection />,
+      };
+    case "second":
+      return {
+        section: <SecondAboutSection />,
+      };
   }
-);
+});
 
 interface LayoutProps {
   title: string;
   content: React.ReactNode;
 }
 
-const App = Unfold(Layout)(
-  M("/")
-    .to("home", HomeRoute)
-    .to("about", AboutRoute),
-  ({ name }) => {
-    switch (name) {
-      case "home":
-        return {
-          title: "Home",
-          content: <HomeRoute />,
-        };
-      case "about":
-        return {
-          title: "About",
-          content: <AboutRoute />,
-        };
-    }
+const App = Unfold(
+  // Typed:
+  // {
+  //   page:
+  //     | { name: "" | "home" }
+  //     | { name: "about"; section: "" | "first" | "second" };
+  // }
+  M("page")
+    .case(M("name").string("", "home"), HomeRoute)
+    .case(M("name").string("about"), AboutRoute)
+)(Layout, ({ page: { name } }) => {
+  switch (name) {
+    case "":
+    case "home":
+      return {
+        title: "Home",
+        content: <HomeRoute />,
+      };
+    case "about":
+      return {
+        title: "About",
+        content: <AboutRoute />,
+      };
   }
-);
+});
+
+// There are more matchers such as: M('rest').rest() to match the remaining
+// segments:
+// M("app")("folders", M('folderPath').rest())
+// With /folders/some/path it matches:
+// { app: { folderPath: 'some/path' } }
+// Other matchers may be needed for regex, hash, and query.
 
 export default App;
 ```
